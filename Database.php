@@ -8,6 +8,12 @@ use mysqli;
 class Database implements DatabaseInterface
 {
     private const SPECIAL_VALUE = 'SPECIAL VALUE';
+    private const PARAMETER = '?';
+    private const PAR_INT = '?d';
+    private const PAR_FLOAT = '?f';
+    private const PAR_ARRAY = '?a';
+    private const PAR_ARRAY_IDENTIFIER = '?#';
+
     private mysqli $mysqli;
 
     public function __construct(mysqli $mysqli)
@@ -25,21 +31,23 @@ class Database implements DatabaseInterface
             throw new Exception('Wrong number of arguments');
         }
         for ($i = 0; $i < count($matches[1]); $i++) {
-            if ($matches[1][$i] == '?') {
-                $query = $this->replaceFirst($query, '?', $this->castArgument($args[$i]));
-            } else if ($matches[1][$i] === '?#') {
+            if ($matches[1][$i] === self::PARAMETER) {
+                $query = $this->replaceFirst($query, self::PARAMETER, $this->castArgument($args[$i]));
+            } else if ($matches[1][$i] === self::PAR_ARRAY_IDENTIFIER) {
                 if (!is_array($args[$i])) {
-                    $query = $this->replaceFirst($query, '?#', '`' . $args[$i] . '`');
+                    $query = $this->replaceFirst($query, self::PAR_ARRAY_IDENTIFIER, '`' . $args[$i] . '`');
                 } else {
                     $arr = array_map(function ($arg) {
                         return '`' . $arg . '`';
                     }, $args[$i]);
-                    $query = $this->replaceFirst($query, '?#', implode(', ', $arr));
+                    $query = $this->replaceFirst($query, self::PAR_ARRAY_IDENTIFIER, implode(', ', $arr));
                 }
-            } else if ($matches[1][$i] === '?d') {
-                $query = $this->replaceFirst($query, '?d', $args[$i]);
-            } else if ($matches[1][$i] === '?a') {
-                $query = $this->replaceFirst($query, '?a', $this->castArray($args[$i]));
+            } else if ($matches[1][$i] === self::PAR_INT) {
+                $query = $this->replaceFirst($query, self::PAR_INT, $args[$i]);
+            } else if ($matches[1][$i] === self::PAR_FLOAT) {
+                $query = $this->replaceFirst($query, self::PAR_FLOAT, $args[$i]);
+            } else if ($matches[1][$i] === self::PAR_ARRAY) {
+                $query = $this->replaceFirst($query, self::PAR_ARRAY, $this->castArray($args[$i]));
             } else {
                 if ($args[$i] === self::SPECIAL_VALUE) {
                     $query = $this->replaceFirst($query, $matches[1][$i]);
