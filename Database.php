@@ -7,6 +7,7 @@ use mysqli;
 
 class Database implements DatabaseInterface
 {
+    private const SPECIAL_VALUE = 'SPECIAL VALUE';
     private mysqli $mysqli;
 
     public function __construct(mysqli $mysqli)
@@ -28,7 +29,7 @@ class Database implements DatabaseInterface
                 $query = preg_replace('/\?/', $this->castArgument($args[$i]), $query, 1);
             } else if ($matches[1][$i] === '?#') {
                 if (!is_array($args[$i])) {
-                    $query = preg_replace('/\?#/', $args[$i], $query, 1);
+                    $query = preg_replace('/\?#/', '`' . $args[$i] . '`', $query, 1);
                 } else {
                     $arr = array_map(function ($arg) {
                         return '`' . $arg . '`';
@@ -40,19 +41,26 @@ class Database implements DatabaseInterface
             } else if ($matches[1][$i] === '?a') {
                 $query = preg_replace('/\?a/', $this->castArray($args[$i]), $query, 1);
             } else {
-                echo $matches[1][$i] . "\n";
-                echo "args[i]=" . $args[$i] . "\n";
-//                $str = sprintf("preg_replace('/%s/', '%s')", $matches[1][$i], $this->buildQuery($matches[1][$i], $args[$i]));
-//                $query = preg_replace()
+                if ($args[$i] === self::SPECIAL_VALUE) {
+                    $pos = strpos($query, $matches[1][$i]);
+                    if ($pos !== false) {
+                        $query = substr_replace($query, "", $pos, strlen($matches[1][$i]));
+                    }
+                } else {
+                    $pos = strpos($query, $matches[1][$i]);
+                    $block = $this->buildQuery($matches[1][$i], [$args[$i]]);
+                    if ($pos !== false) {
+                        $query = substr_replace($query, trim($block, '{}'), $pos, strlen($matches[1][$i]));
+                    }
+                }
             }
         }
-        echo $query . "\n";
         return $query;
     }
 
     public function skip()
     {
-//        throw new Exception();
+        return self::SPECIAL_VALUE;
     }
 
     public function castArgument($arg)
@@ -60,15 +68,15 @@ class Database implements DatabaseInterface
         if (is_numeric($arg)) {
             return $arg;
         } else if (is_null($arg)) {
-            return 'null';
+            return 'NULL';
         } else if (strtolower($arg) === 'null') {
-            return 'null';
+            return 'NULL';
         } else if (strtolower($arg) === 'false') {
             return '0';
         } else if (strtolower($arg) === 'true') {
             return '1';
         } else if (is_array($arg)) {
-            throw new Exception('Without specification only int, float, bool and null are allowed, array provided');
+            throw new Exception('Without specification only int, float, bool and null are allowed but array provided');
         }
         return "'" . $this->mysqli->real_escape_string($arg) . "'";
     }
@@ -93,10 +101,5 @@ class Database implements DatabaseInterface
             }
         }
         return strlen($result) ? substr($result, 0, -2) : $result;
-    }
-
-    private function buildOneArgument(string $query, $arg): string
-    {
-
     }
 }
