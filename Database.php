@@ -26,32 +26,26 @@ class Database implements DatabaseInterface
         }
         for ($i = 0; $i < count($matches[1]); $i++) {
             if ($matches[1][$i] == '?') {
-                $query = preg_replace('/\?/', $this->castArgument($args[$i]), $query, 1);
+                $query = $this->replaceFirst($query, '?', $this->castArgument($args[$i]));
             } else if ($matches[1][$i] === '?#') {
                 if (!is_array($args[$i])) {
-                    $query = preg_replace('/\?#/', '`' . $args[$i] . '`', $query, 1);
+                    $query = $this->replaceFirst($query, '?#', '`' . $args[$i] . '`');
                 } else {
                     $arr = array_map(function ($arg) {
                         return '`' . $arg . '`';
                     }, $args[$i]);
-                    $query = preg_replace('/\?#/', implode(', ', $arr), $query, 1);
+                    $query = $this->replaceFirst($query, '?#', implode(', ', $arr));
                 }
             } else if ($matches[1][$i] === '?d') {
-                $query = preg_replace('/\?d/', $args[$i], $query, 1);
+                $query = $this->replaceFirst($query, '?d', $args[$i]);
             } else if ($matches[1][$i] === '?a') {
-                $query = preg_replace('/\?a/', $this->castArray($args[$i]), $query, 1);
+                $query = $this->replaceFirst($query, '?a', $this->castArray($args[$i]));
             } else {
                 if ($args[$i] === self::SPECIAL_VALUE) {
-                    $pos = strpos($query, $matches[1][$i]);
-                    if ($pos !== false) {
-                        $query = substr_replace($query, "", $pos, strlen($matches[1][$i]));
-                    }
+                    $query = $this->replaceFirst($query, $matches[1][$i]);
                 } else {
-                    $pos = strpos($query, $matches[1][$i]);
                     $block = $this->buildQuery($matches[1][$i], [$args[$i]]);
-                    if ($pos !== false) {
-                        $query = substr_replace($query, trim($block, '{}'), $pos, strlen($matches[1][$i]));
-                    }
+                    $query = $this->replaceFirst($query, $matches[1][$i], trim($block, '{}'));
                 }
             }
         }
@@ -100,6 +94,15 @@ class Database implements DatabaseInterface
                 $result .= '`' . $key . '`' . ' = ' . $this->castArgument($value) . ', ';
             }
         }
-        return strlen($result) ? substr($result, 0, -2) : $result;
+        return trim($result, ', ');
+    }
+
+    private function replaceFirst(string $haystack, string $needle, $replace = ''): string
+    {
+        $pos = strpos($haystack, $needle);
+        if ($pos !== false) {
+            return substr_replace($haystack, $replace, $pos, strlen($needle));
+        }
+        return $haystack;
     }
 }
